@@ -2,7 +2,7 @@ package httpreaderat
 
 import (
 	"bytes"
-	"github.com/pkg/errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -18,6 +18,8 @@ type Store interface {
 	io.ReaderFrom
 	io.ReaderAt
 	io.Closer
+
+	Size() int64
 }
 
 // NewDefaultStore creates a Store with default settings. It buffers up to
@@ -48,7 +50,7 @@ func (s *StoreFile) ReadFrom(r io.Reader) (n int64, err error) {
 	if s.tmpfile != nil {
 		s.Close()
 	}
-	s.tmpfile, err = ioutil.TempFile("", "gotmp")
+	s.tmpfile, err = ioutil.TempFile("", "httpreaderat-file")
 	if err != nil {
 		return 0, err
 	}
@@ -152,7 +154,7 @@ var _ Store = (*LimitedStore)(nil)
 
 // ErrStoreLimit error is returned when LimitedStore's limit is reached
 // and there is no secondary fallback Store defined.
-var ErrStoreLimit = errors.New("store size limit reached")
+var ErrStoreLimit = fmt.Errorf("store size limit reached")
 
 // NewLimitedStore creates a new LimitedStore with the specified settings.
 func NewLimitedStore(primary Store, limit int64, secondary Store) *LimitedStore {
@@ -197,6 +199,10 @@ func (s *LimitedStore) ReadAt(p []byte, off int64) (n int, err error) {
 		return 0, nil
 	}
 	return s.s.ReadAt(p, off)
+}
+
+func (s *LimitedStore) Size() int64 {
+	return s.s.Size()
 }
 
 func (s *LimitedStore) Close() error {

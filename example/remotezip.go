@@ -8,11 +8,13 @@ package main
 import (
 	"archive/zip"
 	"fmt"
-	"github.com/avvmoto/buf-readerat"
-	"github.com/snabb/httpreaderat"
 	"io"
 	"net/http"
 	"os"
+
+	"github.com/avvmoto/buf-readerat"
+
+	"github.com/xakep666/httpreaderat"
 )
 
 func catZipFile(url, fileName string) (err error) {

@@ -1,7 +1,7 @@
 httpreaderat
 ============
 
-[![GoDoc](https://godoc.org/github.com/snabb/httpreaderat?status.svg)](https://godoc.org/github.com/snabb/httpreaderat)
+[![GoDoc](https://godoc.org/github.com/xakep666/httpreaderat?status.svg)](https://pkg.go.dev/github.com/xakep666/httpreaderat)
 
 Go package httpreaderat implements io.ReaderAt that makes HTTP Range Requests.
 
@@ -37,7 +37,7 @@ import (
 	"archive/zip"
 	"fmt"
 	"github.com/avvmoto/buf-readerat"
-	"github.com/snabb/httpreaderat"
+	"github.com/xakep666/httpreaderat"
 	"net/http"
 )
 
