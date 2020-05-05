@@ -1,4 +1,4 @@
-module github.com/xakep666/httpreaderat
+module github.com/xakep666/httpreaderat/v2
 
 go 1.13
 

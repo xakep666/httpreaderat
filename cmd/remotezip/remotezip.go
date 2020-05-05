@@ -20,7 +20,7 @@ import (
 
 	"github.com/avvmoto/buf-readerat"
 
-	"github.com/xakep666/httpreaderat"
+	"github.com/xakep666/httpreaderat/v2"
 )
 
 var (

@@ -8,7 +8,7 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/xakep666/httpreaderat"
+	"github.com/xakep666/httpreaderat/v2"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
