@@ -9,8 +9,8 @@
 package httpreaderat
 
 import (
+	"errors"
 	"fmt"
-	"github.com/pkg/errors"
 	"io"
 	"net/http"
 	"strconv"
@@ -33,11 +33,21 @@ var _ io.ReaderAt = (*HTTPReaderAt)(nil)
 
 // ErrValidationFailed error is returned if the file changed under
 // our feet.
-var ErrValidationFailed = errors.New("validation failed")
+var ErrValidationFailed = fmt.Errorf("validation failed")
 
 // ErrNoRange error is returned if the server does not support range
 // requests and there is no Store defined for buffering the file.
-var ErrNoRange = errors.New("server does not support range requests")
+var ErrNoRange = fmt.Errorf("server does not support range requests")
+
+type ErrUnexpectedResponseCode struct {
+	Code int
+}
+
+func (e *ErrUnexpectedResponseCode) Error() string {
+	return fmt.Sprintf("unexpected response code: %d", e.Code)
+}
+
+var ErrParse = fmt.Errorf("content-range parse error")
 
 // New creates a new HTTPReaderAt. If nil is passed as http.Client, then
 // http.DefaultClient is used. The supplied http.Request is used as a
@@ -50,7 +60,7 @@ func New(client *http.Client, req *http.Request, bs Store) (ra *HTTPReaderAt, er
 		client = http.DefaultClient
 	}
 	if req.Method != "GET" {
-		return nil, errors.New("invalid HTTP method")
+		return nil, fmt.Errorf("invalid HTTP method")
 	}
 	ra = &HTTPReaderAt{
 		client: client,
@@ -97,10 +107,10 @@ func (ra *HTTPReaderAt) readAt(p []byte, off int64, initialize bool) (n int, err
 	if ra.usebs == true {
 		return ra.bs.ReadAt(p, off)
 	}
-	// fmt.Printf("readat off=%d len=%d\n", off, len(p))
 	if len(p) == 0 {
 		return 0, nil
 	}
+
 	req := ra.copyReq()
 
 	reqFirst := off
@@ -123,12 +133,12 @@ func (ra *HTTPReaderAt) readAt(p []byte, off int64, initialize bool) (n int, err
 
 	resp, err := ra.client.Do(req)
 	if err != nil {
-		return 0, errors.Wrap(err, "http request error")
+		return 0, fmt.Errorf("http request error: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusPartialContent {
-		return 0, errors.Errorf("http request error: %s", resp.Status)
+		return 0, &ErrUnexpectedResponseCode{Code: resp.StatusCode}
 	}
 	if initialize {
 		ra.meta = getMeta(resp)
@@ -143,7 +153,7 @@ func (ra *HTTPReaderAt) readAt(p []byte, off int64, initialize bool) (n int, err
 			return 0, ErrNoRange
 		}
 		if !initialize {
-			return 0, errors.New("server suddenly stopped supporting range requests")
+			return 0, fmt.Errorf("server suddenly stopped supporting range requests")
 		}
 		// The following code path is not thread safe.
 		// We end up here only from New
@@ -167,26 +177,26 @@ func (ra *HTTPReaderAt) readAt(p []byte, off int64, initialize bool) (n int, err
 
 	contentRange := resp.Header.Get("Content-Range")
 	if contentRange == "" {
-		return 0, errors.New("no content-range header in partial response")
+		return 0, fmt.Errorf("no content-range header in partial response")
 	}
 	first, last, _, err := parseContentRange(contentRange)
 	if err != nil {
-		return 0, errors.Wrap(err, "http request error")
+		return 0, fmt.Errorf("http request error: %w", err)
 	}
 	if first != reqFirst || last > reqLast {
-		return 0, errors.Errorf(
+		return 0, fmt.Errorf(
 			"received different range than requested (req=%d-%d, resp=%d-%d)",
 			reqFirst, reqLast, first, last)
 	}
 	if resp.ContentLength != last-first+1 {
-		return 0, errors.New("content-length mismatch in http response")
+		return 0, fmt.Errorf("content-length mismatch in http response")
 	}
-	n, err = io.ReadFull(resp.Body, p)
 
-	if err == io.ErrUnexpectedEOF {
+	n, err = io.ReadFull(resp.Body, p)
+	if errors.Is(err, io.ErrUnexpectedEOF) {
 		err = io.EOF
 	}
-	if (err == nil || err == io.EOF) && int64(n) != resp.ContentLength {
+	if (err == nil || errors.Is(err, io.EOF)) && int64(n) != resp.ContentLength {
 		// XXX body size was different from the ContentLength
 		// header? should we do something about it? return error?
 	}
@@ -195,8 +205,6 @@ func (ra *HTTPReaderAt) readAt(p []byte, off int64, initialize bool) (n int, err
 	}
 	return n, err
 }
-
-var errParse = errors.New("content-range parse error")
 
 func parseContentRange(str string) (first, last, length int64, err error) {
 	first, last, length = -1, -1, -1
@@ -208,34 +216,34 @@ func parseContentRange(str string) (first, last, length int64, err error) {
 
 	strs := strings.Split(str, " ")
 	if len(strs) != 2 || strs[0] != "bytes" {
-		return -1, -1, -1, errParse
+		return -1, -1, -1, ErrParse
 	}
 	strs = strings.Split(strs[1], "/")
 	if len(strs) != 2 {
-		return -1, -1, -1, errParse
+		return -1, -1, -1, ErrParse
 	}
 	if strs[1] != "*" {
 		length, err = strconv.ParseInt(strs[1], 10, 64)
 		if err != nil {
-			return -1, -1, -1, errParse
+			return -1, -1, -1, ErrParse
 		}
 	}
 	if strs[0] != "*" {
 		strs = strings.Split(strs[0], "-")
 		if len(strs) != 2 {
-			return -1, -1, -1, errParse
+			return -1, -1, -1, ErrParse
 		}
 		first, err = strconv.ParseInt(strs[0], 10, 64)
 		if err != nil {
-			return -1, -1, -1, errParse
+			return -1, -1, -1, ErrParse
 		}
 		last, err = strconv.ParseInt(strs[1], 10, 64)
 		if err != nil {
-			return -1, -1, -1, errParse
+			return -1, -1, -1, ErrParse
 		}
 	}
 	if first == -1 && last == -1 && length == -1 {
-		return -1, -1, -1, errParse
+		return -1, -1, -1, ErrParse
 	}
 	return first, last, length, nil
 }
