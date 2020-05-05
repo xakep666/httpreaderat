@@ -2,6 +2,10 @@ httpreaderat
 ============
 
 [![GoDoc](https://godoc.org/github.com/xakep666/httpreaderat?status.svg)](https://pkg.go.dev/github.com/xakep666/httpreaderat)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Go Report Card](https://goreportcard.com/badge/github.com/xakep666/httpreaderat)](https://goreportcard.com/report/github.com/xakep666/httpreaderat)
+[![codecov](https://codecov.io/gh/xakep666/httpreaderat/branch/master/graph/badge.svg)](https://codecov.io/gh/xakep666/httpreaderat)
+![Build](https://github.com/xakep666/httpreaderat/workflows/Go/badge.svg)
 
 Go package httpreaderat implements io.ReaderAt that makes HTTP Range Requests.
 
